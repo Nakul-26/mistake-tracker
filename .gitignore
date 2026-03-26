@@ -1,0 +1,76 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+
+# IDE/editor caches
+*.iml
+*.ipr
+*.iws
+.idea/
+.vscode/
+
+# Flutter/Dart/Pub related
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+/build/
+/coverage/
+**/doc/api/
+**/ios/Flutter/.last_build_id
+
+# Android Studio artifacts
+/android/.gradle/
+/android/local.properties
+/android/key.properties
+/android/app/keystore/
+/android/app/build/
+
+# Generated plugin registrants
+/android/app/src/main/kotlin/**/GeneratedPluginRegistrant.*
+/android/app/src/main/java/**/GeneratedPluginRegistrant.*
+/ios/Runner/GeneratedPluginRegistrant.*
+/macos/Runner/GeneratedPluginRegistrant.*
+/linux/flutter/generated_plugin_registrant.cc
+/linux/flutter/generated_plugin_registrant.h
+/windows/runner/generated_plugin_registrant.cc
+/windows/runner/generated_plugin_registrant.h
+/generated_plugin_registrant.dart
+
+# CocoaPods and Apple platform artifacts
+/ios/Pods/
+/ios/Flutter/Flutter.framework
+/ios/Flutter/Flutter.podspec
+/ios/Flutter/App.framework
+/ios/ServiceDefinitions.json
+/ios/Flutter/Generated.xcconfig
+/ios/Podfile.lock
+/ios/Runner/GeneratedPluginRegistrant.*
+/macos/Flutter/Flutter.framework
+/macos/Flutter/Flutter.podspec
+/macos/.symlinks/
+/macos/Flutter/ephemeral/
+
+# Linux build artifacts
+/linux/flutter/ephemeral/
+
+# Windows build artifacts
+/windows/flutter/ephemeral/
+# Web build artifacts
+/web/.dart_tool/
+
+# Coverage and test outputs
+/coverage/
+
+# Miscellaneous generated files
+.metadata
+.snapshot
+
+# Symbolication/obfuscation
+app.*.symbols
+app.*.map.json

@@ -132,7 +132,22 @@ class _AddMistakePageState extends State<AddMistakePage> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Add Mistake'), centerTitle: false),
+      appBar: AppBar(
+        title: const Text('Add Mistake'),
+        centerTitle: false,
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ViewMistakesPage(entries: _entries),
+                ),
+              );
+            },
+            child: const Text('View Mistakes'),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -241,6 +256,20 @@ class _AddMistakePageState extends State<AddMistakePage> {
                 ),
               ),
               const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ViewMistakesPage(entries: _entries),
+                      ),
+                    );
+                  },
+                  child: const Text('View All Mistakes'),
+                ),
+              ),
+              const SizedBox(height: 12),
               if (_entries.isEmpty)
                 Container(
                   width: double.infinity,
@@ -267,6 +296,52 @@ class _AddMistakePageState extends State<AddMistakePage> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class ViewMistakesPage extends StatelessWidget {
+  const ViewMistakesPage({super.key, required this.entries});
+
+  final List<MistakeEntry> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Mistakes List'), centerTitle: false),
+      body: SafeArea(
+        child: entries.isEmpty
+            ? Padding(
+                padding: const EdgeInsets.all(20),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFCF6),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0xFFE7DCC7)),
+                  ),
+                  child: Text(
+                    'No mistakes saved yet. Add one first.',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ),
+              )
+            : ListView.separated(
+                padding: const EdgeInsets.all(20),
+                itemCount: entries.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 12),
+                itemBuilder: (context, index) {
+                  final entry = entries[index];
+                  return _MistakeListItem(
+                    index: index + 1,
+                    entry: entry,
+                  );
+                },
+              ),
       ),
     );
   }
@@ -317,6 +392,44 @@ class _SavedMistakeCard extends StatelessWidget {
     final minute = dateTime.minute.toString().padLeft(2, '0');
     final period = dateTime.hour >= 12 ? 'PM' : 'AM';
     return '${dateTime.day}/${dateTime.month}/${dateTime.year} at $hour:$minute $period';
+  }
+}
+
+class _MistakeListItem extends StatelessWidget {
+  const _MistakeListItem({required this.index, required this.entry});
+
+  final int index;
+  final MistakeEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE7DCC7)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$index. Mistake: ${entry.mistake}',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Lesson: ${entry.lesson}',
+            style: theme.textTheme.bodyLarge,
+          ),
+        ],
+      ),
+    );
   }
 }
 

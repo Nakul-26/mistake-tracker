@@ -37,6 +37,7 @@ class AddMistakePage extends StatefulWidget {
 
 class _AddMistakePageState extends State<AddMistakePage> {
   static const _storageKey = 'saved_mistakes';
+  static const _lastDailyReviewKey = 'last_daily_review_date';
 
   final _formKey = GlobalKey<FormState>();
   final _mistakeController = TextEditingController();
@@ -45,6 +46,7 @@ class _AddMistakePageState extends State<AddMistakePage> {
   final _lessonFocusNode = FocusNode();
 
   bool _isSaving = false;
+  bool _isCheckingDailyReview = false;
   List<MistakeEntry> _entries = const [];
 
   @override
@@ -74,6 +76,8 @@ class _AddMistakePageState extends State<AddMistakePage> {
     setState(() {
       _entries = entries;
     });
+
+    await _presentDailyReviewIfNeeded(entries);
   }
 
   Future<void> _saveEntry() async {
@@ -132,6 +136,56 @@ class _AddMistakePageState extends State<AddMistakePage> {
       _storageKey,
       entries.reversed.map((entry) => jsonEncode(entry.toMap())).toList(),
     );
+  }
+
+  Future<void> _presentDailyReviewIfNeeded(List<MistakeEntry> entries) async {
+    if (_isCheckingDailyReview || entries.isEmpty || !mounted) {
+      return;
+    }
+
+    _isCheckingDailyReview = true;
+    final preferences = await SharedPreferences.getInstance();
+    final today = DateUtils.dateOnly(DateTime.now());
+    final lastReviewDate = DateTime.tryParse(
+      preferences.getString(_lastDailyReviewKey) ?? '',
+    );
+
+    if (lastReviewDate != null &&
+        DateUtils.isSameDay(DateUtils.dateOnly(lastReviewDate), today)) {
+      _isCheckingDailyReview = false;
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) {
+        _isCheckingDailyReview = false;
+        return;
+      }
+
+      final reviewedEntries = await Navigator.of(context)
+          .push<List<MistakeEntry>>(
+            MaterialPageRoute(
+              builder: (_) => DailyReviewPage(entries: entries),
+              fullscreenDialog: true,
+            ),
+          );
+
+      if (reviewedEntries != null) {
+        await _persistEntries(reviewedEntries);
+        await preferences.setString(
+          _lastDailyReviewKey,
+          today.toIso8601String(),
+        );
+
+        if (mounted) {
+          setState(() {
+            _entries = reviewedEntries;
+          });
+        }
+      }
+
+      _isCheckingDailyReview = false;
+    });
   }
 
   Future<void> _markEntryRepeated(MistakeEntry entry) async {
@@ -350,6 +404,167 @@ class ViewMistakesPage extends StatefulWidget {
 
   @override
   State<ViewMistakesPage> createState() => _ViewMistakesPageState();
+}
+
+class DailyReviewPage extends StatefulWidget {
+  const DailyReviewPage({super.key, required this.entries});
+
+  final List<MistakeEntry> entries;
+
+  @override
+  State<DailyReviewPage> createState() => _DailyReviewPageState();
+}
+
+class _DailyReviewPageState extends State<DailyReviewPage> {
+  late List<MistakeEntry> _initialEntries;
+  late List<MistakeEntry> _entries;
+  late List<bool?> _answers;
+
+  bool get _isComplete => _answers.every((answer) => answer != null);
+
+  @override
+  void initState() {
+    super.initState();
+    _initialEntries = List<MistakeEntry>.from(widget.entries);
+    _entries = List<MistakeEntry>.from(widget.entries);
+    _answers = List<bool?>.filled(widget.entries.length, null);
+  }
+
+  void _answerQuestion(int index, bool repeatedToday) {
+    final today = DateUtils.dateOnly(DateTime.now());
+    final entry = _initialEntries[index];
+
+    setState(() {
+      _answers[index] = repeatedToday;
+      _entries = List<MistakeEntry>.from(_entries);
+      _entries[index] = repeatedToday
+          ? entry.copyWith(
+              repeatCount: entry.repeatCount + 1,
+              lastRepeatedOn: today,
+            )
+          : entry;
+    });
+  }
+
+  void _finishReview() {
+    if (!_isComplete) {
+      return;
+    }
+
+    Navigator.of(context).pop(_entries);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Daily Review'),
+        automaticallyImplyLeading: false,
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Did you repeat any of these today?',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Answer each one once. This keeps your mistakes active in memory instead of hidden in a list.',
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Expanded(
+                child: ListView.separated(
+                  itemCount: _entries.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final entry = _entries[index];
+                    final answer = _answers[index];
+
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: const Color(0xFFE7DCC7)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${index + 1}. ${entry.mistake}',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Did you repeat this today?',
+                            style: theme.textTheme.bodyLarge,
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: FilledButton.tonal(
+                                  onPressed: () => _answerQuestion(index, true),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: answer == true
+                                        ? theme.colorScheme.primaryContainer
+                                        : null,
+                                  ),
+                                  child: const Text('Yes'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () =>
+                                      _answerQuestion(index, false),
+                                  style: OutlinedButton.styleFrom(
+                                    backgroundColor: answer == false
+                                        ? const Color(0xFFFFFCF6)
+                                        : null,
+                                  ),
+                                  child: const Text('No'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _isComplete ? _finishReview : null,
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 14),
+                    child: Text('Finish Review'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _ViewMistakesPageState extends State<ViewMistakesPage> {

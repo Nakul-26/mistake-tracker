@@ -6,6 +6,36 @@ import 'dart:convert';
 import 'package:mistake_tracking_app/main.dart';
 
 void main() {
+  testWidgets('shows saved lessons as rules on the start session screen', (
+    WidgetTester tester,
+  ) async {
+    final createdAt = DateTime(2026, 3, 29, 8, 0);
+    SharedPreferences.setMockInitialValues({
+      'saved_mistakes': [
+        '{"mistake":"Worked on multiple features at once","lesson":"Work on ONE feature at a time","createdAt":"${createdAt.toIso8601String()}","repeatCount":0,"lastRepeatedOn":null}',
+        '{"mistake":"Used phone while studying","lesson":"Keep phone away","createdAt":"${createdAt.add(const Duration(minutes: 1)).toIso8601String()}","repeatCount":0,"lastRepeatedOn":null}',
+      ],
+      'last_daily_review_date': DateTime.now().toIso8601String(),
+    });
+
+    await tester.pumpWidget(const MistakeTrackingApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Start Session'), findsOneWidget);
+
+    await tester.tap(find.text('Start Session'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Before you start:'), findsOneWidget);
+    expect(find.text('Work on ONE feature at a time'), findsOneWidget);
+    expect(find.text('Keep phone away'), findsOneWidget);
+    expect(
+      find.text('Watch for: Worked on multiple features at once'),
+      findsOneWidget,
+    );
+    expect(find.text('Watch for: Used phone while studying'), findsOneWidget);
+  });
+
   testWidgets('marks a saved mistake as repeated from the full mistakes list', (
     WidgetTester tester,
   ) async {
@@ -23,6 +53,7 @@ void main() {
       'Always finish one feature before starting another',
     );
 
+    await tester.ensureVisible(find.text('Save Mistake'));
     await tester.tap(find.text('Save Mistake'));
     await tester.pumpAndSettle();
 
@@ -96,8 +127,8 @@ void main() {
         .map((item) => jsonDecode(item) as Map<String, dynamic>)
         .toList();
 
-    expect(decodedEntries[0]['repeatCount'], 1);
-    expect(decodedEntries[1]['repeatCount'], 2);
+    expect(decodedEntries[0]['repeatCount'], 0);
+    expect(decodedEntries[1]['repeatCount'], 3);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();

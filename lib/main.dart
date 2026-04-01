@@ -42,8 +42,10 @@ class _AddMistakePageState extends State<AddMistakePage> {
   final _formKey = GlobalKey<FormState>();
   final _mistakeController = TextEditingController();
   final _lessonController = TextEditingController();
+  final _triggerController = TextEditingController();
   final _mistakeFocusNode = FocusNode();
   final _lessonFocusNode = FocusNode();
+  final _triggerFocusNode = FocusNode();
 
   bool _isSaving = false;
   bool _isCheckingDailyReview = false;
@@ -59,8 +61,10 @@ class _AddMistakePageState extends State<AddMistakePage> {
   void dispose() {
     _mistakeController.dispose();
     _lessonController.dispose();
+    _triggerController.dispose();
     _mistakeFocusNode.dispose();
     _lessonFocusNode.dispose();
+    _triggerFocusNode.dispose();
     super.dispose();
   }
 
@@ -93,6 +97,7 @@ class _AddMistakePageState extends State<AddMistakePage> {
     final newEntry = MistakeEntry(
       mistake: _mistakeController.text.trim(),
       lesson: _lessonController.text.trim(),
+      trigger: _triggerController.text.trim(),
       createdAt: DateTime.now(),
       repeatCount: 0,
     );
@@ -111,6 +116,7 @@ class _AddMistakePageState extends State<AddMistakePage> {
 
     _mistakeController.clear();
     _lessonController.clear();
+    _triggerController.clear();
     _formKey.currentState?.reset();
     FocusScope.of(context).requestFocus(_mistakeFocusNode);
 
@@ -250,7 +256,7 @@ class _AddMistakePageState extends State<AddMistakePage> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Write what happened and the lesson to keep the next decision cleaner.',
+                'Write what happened, the lesson, and when it usually shows up so prevention stays contextual.',
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -347,7 +353,7 @@ class _AddMistakePageState extends State<AddMistakePage> {
                       TextFormField(
                         controller: _lessonController,
                         focusNode: _lessonFocusNode,
-                        textInputAction: TextInputAction.done,
+                        textInputAction: TextInputAction.next,
                         minLines: 2,
                         maxLines: 4,
                         decoration: const InputDecoration(
@@ -356,10 +362,33 @@ class _AddMistakePageState extends State<AddMistakePage> {
                           alignLabelWithHint: true,
                           border: OutlineInputBorder(),
                         ),
-                        onFieldSubmitted: (_) => _saveEntry(),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return 'Enter the lesson.';
+                          }
+                          return null;
+                        },
+                        onFieldSubmitted: (_) {
+                          FocusScope.of(context).requestFocus(_triggerFocusNode);
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _triggerController,
+                        focusNode: _triggerFocusNode,
+                        textInputAction: TextInputAction.done,
+                        minLines: 2,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          labelText: 'Trigger',
+                          hintText: 'When does this usually happen?',
+                          alignLabelWithHint: true,
+                          border: OutlineInputBorder(),
+                        ),
+                        onFieldSubmitted: (_) => _saveEntry(),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Enter the trigger.';
                           }
                           return null;
                         },
@@ -632,6 +661,13 @@ class _DailyReviewPageState extends State<DailyReviewPage> {
                           ),
                           const SizedBox(height: 12),
                           Text(
+                            'Trigger: ${entry.trigger}',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
                             'Did you repeat this today?',
                             style: theme.textTheme.bodyLarge,
                           ),
@@ -790,6 +826,13 @@ class _SavedMistakeCard extends StatelessWidget {
           Text(entry.lesson, style: theme.textTheme.bodyLarge),
           const SizedBox(height: 10),
           Text(
+            'Trigger: ${entry.trigger}',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
             'Repeated: ${entry.repeatCount} times',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
@@ -849,6 +892,13 @@ class _MistakeListItem extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text('Lesson: ${entry.lesson}', style: theme.textTheme.bodyLarge),
+          const SizedBox(height: 8),
+          Text(
+            'Trigger: ${entry.trigger}',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
           const SizedBox(height: 8),
           Text(
             'Repeated: ${entry.repeatCount} times',
@@ -913,6 +963,13 @@ class _SessionRuleItem extends StatelessWidget {
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
+              const SizedBox(height: 4),
+              Text(
+                'Trigger: ${entry.trigger}',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
             ],
           ),
         ),
@@ -925,6 +982,7 @@ class MistakeEntry {
   const MistakeEntry({
     required this.mistake,
     required this.lesson,
+    required this.trigger,
     required this.createdAt,
     required this.repeatCount,
     this.lastRepeatedOn,
@@ -932,6 +990,7 @@ class MistakeEntry {
 
   final String mistake;
   final String lesson;
+  final String trigger;
   final DateTime createdAt;
   final int repeatCount;
   final DateTime? lastRepeatedOn;
@@ -939,6 +998,7 @@ class MistakeEntry {
   MistakeEntry copyWith({
     String? mistake,
     String? lesson,
+    String? trigger,
     DateTime? createdAt,
     int? repeatCount,
     DateTime? lastRepeatedOn,
@@ -947,6 +1007,7 @@ class MistakeEntry {
     return MistakeEntry(
       mistake: mistake ?? this.mistake,
       lesson: lesson ?? this.lesson,
+      trigger: trigger ?? this.trigger,
       createdAt: createdAt ?? this.createdAt,
       repeatCount: repeatCount ?? this.repeatCount,
       lastRepeatedOn: clearLastRepeatedOn
@@ -959,6 +1020,7 @@ class MistakeEntry {
     return {
       'mistake': mistake,
       'lesson': lesson,
+      'trigger': trigger,
       'createdAt': createdAt.toIso8601String(),
       'repeatCount': repeatCount,
       'lastRepeatedOn': lastRepeatedOn?.toIso8601String(),
@@ -969,6 +1031,7 @@ class MistakeEntry {
     return MistakeEntry(
       mistake: map['mistake'] as String? ?? '',
       lesson: map['lesson'] as String? ?? '',
+      trigger: map['trigger'] as String? ?? '',
       createdAt:
           DateTime.tryParse(map['createdAt'] as String? ?? '') ??
           DateTime.now(),

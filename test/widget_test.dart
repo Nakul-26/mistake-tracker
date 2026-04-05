@@ -6,7 +6,7 @@ import 'dart:convert';
 import 'package:mistake_tracking_app/main.dart';
 
 void main() {
-  testWidgets('shows saved lessons as rules on the start session screen', (
+  testWidgets('filters start session reminders by selected context', (
     WidgetTester tester,
   ) async {
     final createdAt = DateTime(2026, 3, 29, 8, 0);
@@ -26,19 +26,37 @@ void main() {
     await tester.tap(find.text('Start Session'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Before you start:'), findsOneWidget);
+    expect(find.text('What are you about to do?'), findsOneWidget);
+    expect(find.text('Before you start coding:'), findsNothing);
+
+    await tester.tap(find.text('Coding'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Before you start coding:'), findsOneWidget);
     expect(find.text('Work on ONE feature at a time'), findsOneWidget);
-    expect(find.text('Keep phone away'), findsOneWidget);
+    expect(find.text('Keep phone away'), findsNothing);
     expect(
       find.text('Watch for: Worked on multiple features at once'),
       findsOneWidget,
     );
-    expect(find.text('Watch for: Used phone while studying'), findsOneWidget);
+    expect(find.text('Watch for: Used phone while studying'), findsNothing);
     expect(
       find.text('Trigger: When starting a coding session'),
       findsOneWidget,
     );
-    expect(find.text('Trigger: When sitting down to study'), findsOneWidget);
+    expect(find.text('Trigger: When sitting down to study'), findsNothing);
+
+    await tester.tap(find.text('Studying'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Before you start studying:'), findsOneWidget);
+    expect(find.text('Keep phone away'), findsOneWidget);
+    expect(find.text('Work on ONE feature at a time'), findsNothing);
+    expect(find.text('Watch for: Used phone while studying'), findsOneWidget);
+    expect(
+      find.text('Trigger: When sitting down to study'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('marks a saved mistake as repeated from the full mistakes list', (

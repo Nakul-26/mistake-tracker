@@ -480,21 +480,42 @@ class ViewMistakesPage extends StatefulWidget {
   State<ViewMistakesPage> createState() => _ViewMistakesPageState();
 }
 
-class StartSessionPage extends StatelessWidget {
+enum SessionContext { coding, studying, general }
+
+class StartSessionPage extends StatefulWidget {
   const StartSessionPage({super.key, required this.entries});
 
   final List<MistakeEntry> entries;
 
   @override
+  State<StartSessionPage> createState() => _StartSessionPageState();
+}
+
+class _StartSessionPageState extends State<StartSessionPage> {
+  SessionContext? _selectedContext;
+
+  List<MistakeEntry> get _filteredEntries {
+    final selectedContext = _selectedContext;
+    if (selectedContext == null) {
+      return const [];
+    }
+
+    return widget.entries
+        .where((entry) => _matchesSessionContext(entry.trigger, selectedContext))
+        .toList(growable: false);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final filteredEntries = _filteredEntries;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Start Session'), centerTitle: false),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),
-          child: entries.isEmpty
+          child: widget.entries.isEmpty
               ? Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(18),
@@ -526,28 +547,82 @@ class StartSessionPage extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Before you start:',
+                        'What are you about to do?',
                         style: theme.textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Read these once before you begin. This is the prevention step, not the post-mortem.',
+                        'Pick the context first. The app will only show reminders that match this session.',
                         style: theme.textTheme.bodyLarge?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
+                      const SizedBox(height: 16),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: SessionContext.values.map((context) {
+                          return ChoiceChip(
+                            label: Text(_sessionContextLabel(context)),
+                            selected: _selectedContext == context,
+                            onSelected: (_) {
+                              setState(() {
+                                _selectedContext = context;
+                              });
+                            },
+                          );
+                        }).toList(growable: false),
+                      ),
                       const SizedBox(height: 20),
-                      ...entries.asMap().entries.map(
-                        (item) => Padding(
-                          padding: const EdgeInsets.only(bottom: 14),
-                          child: _SessionRuleItem(
-                            index: item.key + 1,
-                            entry: item.value,
+                      if (_selectedContext == null)
+                        Text(
+                          'Select one option to start the reminder pass.',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        )
+                      else ...[
+                        Text(
+                          _sessionHeading(_selectedContext!),
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
-                      ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Read these once before you begin. This is the prevention step, not the post-mortem.',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        if (filteredEntries.isEmpty)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFFCF6),
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: const Color(0xFFE7DCC7)),
+                            ),
+                            child: Text(
+                              'No saved reminders match this context yet.',
+                              style: theme.textTheme.bodyLarge,
+                            ),
+                          )
+                        else
+                          ...filteredEntries.asMap().entries.map(
+                            (item) => Padding(
+                              padding: const EdgeInsets.only(bottom: 14),
+                              child: _SessionRuleItem(
+                                index: item.key + 1,
+                                entry: item.value,
+                              ),
+                            ),
+                          ),
+                      ],
                     ],
                   ),
                 ),
@@ -555,6 +630,56 @@ class StartSessionPage extends StatelessWidget {
       ),
     );
   }
+}
+
+bool _matchesSessionContext(String trigger, SessionContext context) {
+  final normalizedTrigger = trigger.toLowerCase();
+  final isCoding = _containsAny(normalizedTrigger, const [
+    'coding',
+    'code',
+    'programming',
+    'developer',
+    'development',
+    'debug',
+    'feature',
+    'bug',
+  ]);
+  final isStudying = _containsAny(normalizedTrigger, const [
+    'study',
+    'studying',
+    'exam',
+    'revision',
+    'learn',
+    'learning',
+    'class',
+    'homework',
+  ]);
+
+  return switch (context) {
+    SessionContext.coding => isCoding,
+    SessionContext.studying => isStudying,
+    SessionContext.general => !isCoding && !isStudying,
+  };
+}
+
+bool _containsAny(String text, List<String> keywords) {
+  return keywords.any(text.contains);
+}
+
+String _sessionContextLabel(SessionContext context) {
+  return switch (context) {
+    SessionContext.coding => 'Coding',
+    SessionContext.studying => 'Studying',
+    SessionContext.general => 'General',
+  };
+}
+
+String _sessionHeading(SessionContext context) {
+  return switch (context) {
+    SessionContext.coding => 'Before you start coding:',
+    SessionContext.studying => 'Before you start studying:',
+    SessionContext.general => 'Before you start:',
+  };
 }
 
 class DailyReviewPage extends StatefulWidget {

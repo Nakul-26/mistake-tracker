@@ -195,4 +195,83 @@ void main() {
     expect(find.text('Daily Review'), findsNothing);
     expect(find.text('Add Mistake'), findsOneWidget);
   });
+
+  testWidgets('edits an existing mistake and persists the updated rule', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+
+    await tester.pumpWidget(const MistakeTrackingApp());
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byType(TextFormField).at(0),
+      'Worked on many features',
+    );
+    await tester.enterText(
+      find.byType(TextFormField).at(1),
+      'Focus on one feature',
+    );
+    await tester.enterText(
+      find.byType(TextFormField).at(2),
+      'Coding',
+    );
+
+    await tester.ensureVisible(find.text('Save Mistake'));
+    await tester.tap(find.text('Save Mistake'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('View All Mistakes'));
+    await tester.tap(find.text('View All Mistakes'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('1. Mistake: Worked on many features'), findsOneWidget);
+    expect(find.text('Lesson: Focus on one feature'), findsOneWidget);
+    expect(find.text('Trigger: Coding'), findsOneWidget);
+
+    await tester.tap(find.text('Edit'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit Mistake'), findsOneWidget);
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Mistake'),
+      'Worked on 2-3 features at once',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Lesson'),
+      'Strictly ONE feature only',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Trigger'),
+      'Starting coding session',
+    );
+
+    await tester.ensureVisible(find.text('Update Mistake'));
+    await tester.tap(find.text('Update Mistake'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Worked on many features'), findsNothing);
+    expect(find.text('1. Mistake: Worked on 2-3 features at once'), findsOneWidget);
+    expect(find.text('Lesson: Strictly ONE feature only'), findsOneWidget);
+    expect(find.text('Trigger: Starting coding session'), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Worked on 2-3 features at once'), findsOneWidget);
+    expect(find.text('Strictly ONE feature only'), findsOneWidget);
+    expect(find.text('Trigger: Starting coding session'), findsOneWidget);
+
+    final preferences = await SharedPreferences.getInstance();
+    final savedEntries = preferences.getStringList('saved_mistakes');
+
+    expect(savedEntries, isNotNull);
+
+    final decodedEntry =
+        jsonDecode(savedEntries!.single) as Map<String, dynamic>;
+    expect(decodedEntry['mistake'], 'Worked on 2-3 features at once');
+    expect(decodedEntry['lesson'], 'Strictly ONE feature only');
+    expect(decodedEntry['trigger'], 'Starting coding session');
+  });
 }

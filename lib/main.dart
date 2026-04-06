@@ -218,6 +218,29 @@ class _AddMistakePageState extends State<AddMistakePage> {
     });
   }
 
+  Future<void> _updateEntry(
+    MistakeEntry originalEntry,
+    MistakeEntry updatedEntry,
+  ) async {
+    final updatedEntries = _entries
+        .map(
+          (currentEntry) => currentEntry.createdAt == originalEntry.createdAt
+              ? updatedEntry
+              : currentEntry,
+        )
+        .toList(growable: false);
+
+    await _persistEntries(updatedEntries);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _entries = updatedEntries;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -234,6 +257,7 @@ class _AddMistakePageState extends State<AddMistakePage> {
                   builder: (_) => ViewMistakesPage(
                     entries: _entries,
                     onMarkRepeated: _markEntryRepeated,
+                    onUpdateEntry: _updateEntry,
                   ),
                 ),
               );
@@ -427,6 +451,7 @@ class _AddMistakePageState extends State<AddMistakePage> {
                         builder: (_) => ViewMistakesPage(
                           entries: _entries,
                           onMarkRepeated: _markEntryRepeated,
+                          onUpdateEntry: _updateEntry,
                         ),
                       ),
                     );
@@ -471,10 +496,16 @@ class ViewMistakesPage extends StatefulWidget {
     super.key,
     required this.entries,
     required this.onMarkRepeated,
+    required this.onUpdateEntry,
   });
 
   final List<MistakeEntry> entries;
   final Future<void> Function(MistakeEntry entry) onMarkRepeated;
+  final Future<void> Function(
+    MistakeEntry originalEntry,
+    MistakeEntry updatedEntry,
+  )
+  onUpdateEntry;
 
   @override
   State<ViewMistakesPage> createState() => _ViewMistakesPageState();
@@ -879,6 +910,41 @@ class _ViewMistakesPageState extends State<ViewMistakesPage> {
     await widget.onMarkRepeated(entry);
   }
 
+  Future<void> _handleEditEntry(MistakeEntry entry) async {
+    final updatedEntry = await Navigator.of(context).push<MistakeEntry>(
+      MaterialPageRoute(
+        builder: (_) => EditMistakePage(entry: entry),
+        fullscreenDialog: true,
+      ),
+    );
+
+    if (updatedEntry == null || !mounted) {
+      return;
+    }
+
+    final updatedEntries = _entries
+        .map(
+          (currentEntry) => currentEntry.createdAt == entry.createdAt
+              ? updatedEntry
+              : currentEntry,
+        )
+        .toList(growable: false);
+
+    setState(() {
+      _entries = updatedEntries;
+    });
+
+    await widget.onUpdateEntry(entry, updatedEntry);
+
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Mistake updated.')));
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -913,9 +979,151 @@ class _ViewMistakesPageState extends State<ViewMistakesPage> {
                     index: index + 1,
                     entry: entry,
                     onMarkRepeated: () => _handleMarkRepeated(entry),
+                    onEdit: () => _handleEditEntry(entry),
                   );
                 },
               ),
+      ),
+    );
+  }
+}
+
+class EditMistakePage extends StatefulWidget {
+  const EditMistakePage({super.key, required this.entry});
+
+  final MistakeEntry entry;
+
+  @override
+  State<EditMistakePage> createState() => _EditMistakePageState();
+}
+
+class _EditMistakePageState extends State<EditMistakePage> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _mistakeController;
+  late final TextEditingController _lessonController;
+  late final TextEditingController _triggerController;
+
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _mistakeController = TextEditingController(text: widget.entry.mistake);
+    _lessonController = TextEditingController(text: widget.entry.lesson);
+    _triggerController = TextEditingController(text: widget.entry.trigger);
+  }
+
+  @override
+  void dispose() {
+    _mistakeController.dispose();
+    _lessonController.dispose();
+    _triggerController.dispose();
+    super.dispose();
+  }
+
+  void _saveChanges() {
+    final currentState = _formKey.currentState;
+    if (currentState == null || !currentState.validate() || _isSaving) {
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    Navigator.of(context).pop(
+      widget.entry.copyWith(
+        mistake: _mistakeController.text.trim(),
+        lesson: _lessonController.text.trim(),
+        trigger: _triggerController.text.trim(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Edit Mistake'), centerTitle: false),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                TextFormField(
+                  controller: _mistakeController,
+                  autofocus: true,
+                  textInputAction: TextInputAction.next,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Mistake',
+                    hintText: 'What happened?',
+                    alignLabelWithHint: true,
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Enter the mistake.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _lessonController,
+                  textInputAction: TextInputAction.next,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Lesson',
+                    hintText: 'What will you do instead?',
+                    alignLabelWithHint: true,
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Enter the lesson.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _triggerController,
+                  textInputAction: TextInputAction.done,
+                  minLines: 2,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Trigger',
+                    hintText: 'When does this usually happen?',
+                    alignLabelWithHint: true,
+                    border: OutlineInputBorder(),
+                  ),
+                  onFieldSubmitted: (_) => _saveChanges(),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Enter the trigger.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _isSaving ? null : _saveChanges,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      child: Text(_isSaving ? 'Saving...' : 'Update Mistake'),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -988,11 +1196,13 @@ class _MistakeListItem extends StatelessWidget {
     required this.index,
     required this.entry,
     required this.onMarkRepeated,
+    required this.onEdit,
   });
 
   final int index;
   final MistakeEntry entry;
   final VoidCallback onMarkRepeated;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -1032,9 +1242,22 @@ class _MistakeListItem extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          OutlinedButton(
-            onPressed: onMarkRepeated,
-            child: const Text('Repeated Today'),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: onEdit,
+                  child: const Text('Edit'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: onMarkRepeated,
+                  child: const Text('Repeated Today'),
+                ),
+              ),
+            ],
           ),
         ],
       ),

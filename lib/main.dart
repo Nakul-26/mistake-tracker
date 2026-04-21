@@ -241,6 +241,22 @@ class _AddMistakePageState extends State<AddMistakePage> {
     });
   }
 
+  Future<void> _deleteEntry(MistakeEntry entry) async {
+    final updatedEntries = _entries
+        .where((currentEntry) => currentEntry.createdAt != entry.createdAt)
+        .toList(growable: false);
+
+    await _persistEntries(updatedEntries);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _entries = updatedEntries;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -258,6 +274,7 @@ class _AddMistakePageState extends State<AddMistakePage> {
                     entries: _entries,
                     onMarkRepeated: _markEntryRepeated,
                     onUpdateEntry: _updateEntry,
+                    onDeleteEntry: _deleteEntry,
                   ),
                 ),
               );
@@ -317,7 +334,8 @@ class _AddMistakePageState extends State<AddMistakePage> {
                         onPressed: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => StartSessionPage(entries: _entries),
+                              builder: (_) =>
+                                  StartSessionPage(entries: _entries),
                             ),
                           );
                         },
@@ -393,7 +411,9 @@ class _AddMistakePageState extends State<AddMistakePage> {
                           return null;
                         },
                         onFieldSubmitted: (_) {
-                          FocusScope.of(context).requestFocus(_triggerFocusNode);
+                          FocusScope.of(
+                            context,
+                          ).requestFocus(_triggerFocusNode);
                         },
                       ),
                       const SizedBox(height: 16),
@@ -452,6 +472,7 @@ class _AddMistakePageState extends State<AddMistakePage> {
                           entries: _entries,
                           onMarkRepeated: _markEntryRepeated,
                           onUpdateEntry: _updateEntry,
+                          onDeleteEntry: _deleteEntry,
                         ),
                       ),
                     );
@@ -497,6 +518,7 @@ class ViewMistakesPage extends StatefulWidget {
     required this.entries,
     required this.onMarkRepeated,
     required this.onUpdateEntry,
+    required this.onDeleteEntry,
   });
 
   final List<MistakeEntry> entries;
@@ -506,6 +528,7 @@ class ViewMistakesPage extends StatefulWidget {
     MistakeEntry updatedEntry,
   )
   onUpdateEntry;
+  final Future<void> Function(MistakeEntry entry) onDeleteEntry;
 
   @override
   State<ViewMistakesPage> createState() => _ViewMistakesPageState();
@@ -532,7 +555,9 @@ class _StartSessionPageState extends State<StartSessionPage> {
     }
 
     return widget.entries
-        .where((entry) => _matchesSessionContext(entry.trigger, selectedContext))
+        .where(
+          (entry) => _matchesSessionContext(entry.trigger, selectedContext),
+        )
         .toList(growable: false);
   }
 
@@ -594,17 +619,19 @@ class _StartSessionPageState extends State<StartSessionPage> {
                       Wrap(
                         spacing: 10,
                         runSpacing: 10,
-                        children: SessionContext.values.map((context) {
-                          return ChoiceChip(
-                            label: Text(_sessionContextLabel(context)),
-                            selected: _selectedContext == context,
-                            onSelected: (_) {
-                              setState(() {
-                                _selectedContext = context;
-                              });
-                            },
-                          );
-                        }).toList(growable: false),
+                        children: SessionContext.values
+                            .map((context) {
+                              return ChoiceChip(
+                                label: Text(_sessionContextLabel(context)),
+                                selected: _selectedContext == context,
+                                onSelected: (_) {
+                                  setState(() {
+                                    _selectedContext = context;
+                                  });
+                                },
+                              );
+                            })
+                            .toList(growable: false),
                       ),
                       const SizedBox(height: 20),
                       if (_selectedContext == null)
@@ -636,7 +663,9 @@ class _StartSessionPageState extends State<StartSessionPage> {
                             decoration: BoxDecoration(
                               color: const Color(0xFFFFFCF6),
                               borderRadius: BorderRadius.circular(18),
-                              border: Border.all(color: const Color(0xFFE7DCC7)),
+                              border: Border.all(
+                                color: const Color(0xFFE7DCC7),
+                              ),
                             ),
                             child: Text(
                               'No saved reminders match this context yet.',
@@ -945,6 +974,52 @@ class _ViewMistakesPageState extends State<ViewMistakesPage> {
     ).showSnackBar(const SnackBar(content: Text('Mistake updated.')));
   }
 
+  Future<void> _handleDeleteEntry(MistakeEntry entry) async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete mistake?'),
+          content: Text(
+            'This will remove "${entry.mistake}" from your active mistakes.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete != true || !mounted) {
+      return;
+    }
+
+    final updatedEntries = _entries
+        .where((currentEntry) => currentEntry.createdAt != entry.createdAt)
+        .toList(growable: false);
+
+    setState(() {
+      _entries = updatedEntries;
+    });
+
+    await widget.onDeleteEntry(entry);
+
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Mistake deleted.')));
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -980,6 +1055,7 @@ class _ViewMistakesPageState extends State<ViewMistakesPage> {
                     entry: entry,
                     onMarkRepeated: () => _handleMarkRepeated(entry),
                     onEdit: () => _handleEditEntry(entry),
+                    onDelete: () => _handleDeleteEntry(entry),
                   );
                 },
               ),
@@ -1197,12 +1273,14 @@ class _MistakeListItem extends StatelessWidget {
     required this.entry,
     required this.onMarkRepeated,
     required this.onEdit,
+    required this.onDelete,
   });
 
   final int index;
   final MistakeEntry entry;
   final VoidCallback onMarkRepeated;
   final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -1253,11 +1331,22 @@ class _MistakeListItem extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: OutlinedButton(
-                  onPressed: onMarkRepeated,
-                  child: const Text('Repeated Today'),
+                  onPressed: onDelete,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: theme.colorScheme.error,
+                  ),
+                  child: const Text('Delete'),
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: onMarkRepeated,
+              child: const Text('Repeated Today'),
+            ),
           ),
         ],
       ),

@@ -53,10 +53,7 @@ void main() {
     expect(find.text('Keep phone away'), findsOneWidget);
     expect(find.text('Work on ONE feature at a time'), findsNothing);
     expect(find.text('Watch for: Used phone while studying'), findsOneWidget);
-    expect(
-      find.text('Trigger: When sitting down to study'),
-      findsOneWidget,
-    );
+    expect(find.text('Trigger: When sitting down to study'), findsOneWidget);
   });
 
   testWidgets('marks a saved mistake as repeated from the full mistakes list', (
@@ -176,15 +173,9 @@ void main() {
         .toList();
 
     expect(decodedEntries[0]['repeatCount'], 0);
-    expect(
-      decodedEntries[0]['trigger'],
-      'When beginning a new task block',
-    );
+    expect(decodedEntries[0]['trigger'], 'When beginning a new task block');
     expect(decodedEntries[1]['repeatCount'], 3);
-    expect(
-      decodedEntries[1]['trigger'],
-      'When the study session feels boring',
-    );
+    expect(decodedEntries[1]['trigger'], 'When the study session feels boring');
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();
@@ -212,10 +203,7 @@ void main() {
       find.byType(TextFormField).at(1),
       'Focus on one feature',
     );
-    await tester.enterText(
-      find.byType(TextFormField).at(2),
-      'Coding',
-    );
+    await tester.enterText(find.byType(TextFormField).at(2), 'Coding');
 
     await tester.ensureVisible(find.text('Save Mistake'));
     await tester.tap(find.text('Save Mistake'));
@@ -252,7 +240,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Worked on many features'), findsNothing);
-    expect(find.text('1. Mistake: Worked on 2-3 features at once'), findsOneWidget);
+    expect(
+      find.text('1. Mistake: Worked on 2-3 features at once'),
+      findsOneWidget,
+    );
     expect(find.text('Lesson: Strictly ONE feature only'), findsOneWidget);
     expect(find.text('Trigger: Starting coding session'), findsOneWidget);
 
@@ -273,5 +264,78 @@ void main() {
     expect(decodedEntry['mistake'], 'Worked on 2-3 features at once');
     expect(decodedEntry['lesson'], 'Strictly ONE feature only');
     expect(decodedEntry['trigger'], 'Starting coding session');
+  });
+
+  testWidgets('deletes a mistake and persists the active list', (
+    WidgetTester tester,
+  ) async {
+    final createdAt = DateTime(2026, 3, 29, 8, 0);
+    SharedPreferences.setMockInitialValues({
+      'saved_mistakes': [
+        '{"mistake":"Worked on multiple features","lesson":"Finish one before starting another","trigger":"Coding","createdAt":"${createdAt.toIso8601String()}","repeatCount":0,"lastRepeatedOn":null}',
+        '{"mistake":"Used phone while studying","lesson":"Keep phone away","trigger":"Studying","createdAt":"${createdAt.add(const Duration(minutes: 1)).toIso8601String()}","repeatCount":0,"lastRepeatedOn":null}',
+        '{"mistake":"Skipped testing","lesson":"Run tests before stopping","trigger":"Finishing work","createdAt":"${createdAt.add(const Duration(minutes: 2)).toIso8601String()}","repeatCount":0,"lastRepeatedOn":null}',
+      ],
+      'last_daily_review_date': DateTime.now().toIso8601String(),
+    });
+
+    await tester.pumpWidget(const MistakeTrackingApp());
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('View All Mistakes'));
+    await tester.tap(find.text('View All Mistakes'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('1. Mistake: Skipped testing'), findsOneWidget);
+    expect(find.text('2. Mistake: Used phone while studying'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Delete').at(1));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Delete mistake?'), findsOneWidget);
+    expect(
+      find.text(
+        'This will remove "Used phone while studying" from your active mistakes.',
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mistake deleted.'), findsOneWidget);
+    expect(find.text('1. Mistake: Skipped testing'), findsOneWidget);
+    expect(find.text('Used phone while studying'), findsNothing);
+    expect(
+      find.text('2. Mistake: Worked on multiple features'),
+      findsOneWidget,
+    );
+    expect(find.text('3. Mistake: Worked on multiple features'), findsNothing);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Used phone while studying'), findsNothing);
+    expect(find.text('Skipped testing'), findsOneWidget);
+    expect(find.text('Worked on multiple features'), findsOneWidget);
+
+    final preferences = await SharedPreferences.getInstance();
+    final savedEntries = preferences.getStringList('saved_mistakes');
+
+    expect(savedEntries, isNotNull);
+    expect(savedEntries, hasLength(2));
+
+    final decodedEntries = savedEntries!
+        .map((item) => jsonDecode(item) as Map<String, dynamic>)
+        .toList();
+
+    expect(
+      decodedEntries.map((entry) => entry['mistake']),
+      containsAllInOrder(['Worked on multiple features', 'Skipped testing']),
+    );
+    expect(
+      decodedEntries.map((entry) => entry['mistake']),
+      isNot(contains('Used phone while studying')),
+    );
   });
 }

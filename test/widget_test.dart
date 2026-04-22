@@ -118,6 +118,48 @@ void main() {
     expect(find.text('Repeated: 1 times'), findsOneWidget);
   });
 
+  testWidgets('sorts mistakes by repeat count in the full list', (
+    WidgetTester tester,
+  ) async {
+    final createdAt = DateTime(2026, 3, 29, 8, 0);
+    SharedPreferences.setMockInitialValues({
+      'saved_mistakes': [
+        '{"mistake":"Skipped testing","lesson":"Run tests before stopping","trigger":"Finishing work","createdAt":"${createdAt.toIso8601String()}","repeatCount":2,"lastRepeatedOn":null}',
+        '{"mistake":"Worked on multiple features","lesson":"Finish one before starting another","trigger":"Coding","createdAt":"${createdAt.add(const Duration(minutes: 1)).toIso8601String()}","repeatCount":5,"lastRepeatedOn":null}',
+        '{"mistake":"Used phone while studying","lesson":"Keep phone away","trigger":"Studying","createdAt":"${createdAt.add(const Duration(minutes: 2)).toIso8601String()}","repeatCount":7,"lastRepeatedOn":null}',
+      ],
+      'last_daily_review_date': DateTime.now().toIso8601String(),
+    });
+
+    await tester.pumpWidget(const MistakeTrackingApp());
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('View All Mistakes'));
+    await tester.tap(find.text('View All Mistakes'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('1. Mistake: Used phone while studying'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('2. Mistake: Worked on multiple features'),
+      findsOneWidget,
+    );
+    expect(find.text('Repeated: 7 times'), findsOneWidget);
+    expect(find.text('Repeated: 5 times'), findsOneWidget);
+
+    await tester.dragUntilVisible(
+      find.text('3. Mistake: Skipped testing'),
+      find.byType(ListView),
+      const Offset(0, -200),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('3. Mistake: Skipped testing'), findsOneWidget);
+    expect(find.text('Repeated: 2 times'), findsOneWidget);
+  });
+
   testWidgets('shows the daily review once per day and updates repeat counts', (
     WidgetTester tester,
   ) async {

@@ -260,6 +260,7 @@ class _AddMistakePageState extends State<AddMistakePage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final prioritizedEntries = _prioritizeMistakeEntries(_entries);
 
     return Scaffold(
       appBar: AppBar(
@@ -496,7 +497,7 @@ class _AddMistakePageState extends State<AddMistakePage> {
                   ),
                 )
               else
-                ..._entries
+                ...prioritizedEntries
                     .take(5)
                     .map(
                       (entry) => Padding(
@@ -558,7 +559,8 @@ class _StartSessionPageState extends State<StartSessionPage> {
         .where(
           (entry) => _matchesSessionContext(entry.trigger, selectedContext),
         )
-        .toList(growable: false);
+        .toList(growable: false)
+      ..sort(_compareMistakeEntries);
   }
 
   @override
@@ -761,8 +763,8 @@ class _DailyReviewPageState extends State<DailyReviewPage> {
   @override
   void initState() {
     super.initState();
-    _initialEntries = List<MistakeEntry>.from(widget.entries);
-    _entries = List<MistakeEntry>.from(widget.entries);
+    _initialEntries = _prioritizeMistakeEntries(widget.entries);
+    _entries = List<MistakeEntry>.from(_initialEntries);
     _answers = List<bool?>.filled(widget.entries.length, null);
   }
 
@@ -793,6 +795,7 @@ class _DailyReviewPageState extends State<DailyReviewPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // final prioritizedEntries = _prioritizeMistakeEntries(_entries);
 
     return Scaffold(
       appBar: AppBar(
@@ -1023,6 +1026,7 @@ class _ViewMistakesPageState extends State<ViewMistakesPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final prioritizedEntries = _prioritizeMistakeEntries(_entries);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Mistakes List'), centerTitle: false),
@@ -1046,10 +1050,10 @@ class _ViewMistakesPageState extends State<ViewMistakesPage> {
               )
             : ListView.separated(
                 padding: const EdgeInsets.all(20),
-                itemCount: _entries.length,
+                itemCount: prioritizedEntries.length,
                 separatorBuilder: (_, _) => const SizedBox(height: 12),
                 itemBuilder: (context, index) {
-                  final entry = _entries[index];
+                  final entry = prioritizedEntries[index];
                   return _MistakeListItem(
                     index: index + 1,
                     entry: entry,
@@ -1203,6 +1207,21 @@ class _EditMistakePageState extends State<EditMistakePage> {
       ),
     );
   }
+}
+
+List<MistakeEntry> _prioritizeMistakeEntries(List<MistakeEntry> entries) {
+  final prioritizedEntries = List<MistakeEntry>.from(entries);
+  prioritizedEntries.sort(_compareMistakeEntries);
+  return prioritizedEntries;
+}
+
+int _compareMistakeEntries(MistakeEntry a, MistakeEntry b) {
+  final repeatComparison = b.repeatCount.compareTo(a.repeatCount);
+  if (repeatComparison != 0) {
+    return repeatComparison;
+  }
+
+  return b.createdAt.compareTo(a.createdAt);
 }
 
 class _SavedMistakeCard extends StatelessWidget {
